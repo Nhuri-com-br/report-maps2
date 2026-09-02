@@ -3,17 +3,17 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Plus, LogOut, User, Building2, UserCheck, Sparkles, Map as MapIcon } from 'lucide-react';
+import { Plus, LogOut, User, Building2, UserCheck } from 'lucide-react';
 import { APP_NAME } from '../constants';
-import { auth, loginWithGoogle, logout } from '../lib/firebase';
+import { onAppAuthStateChanged, logout, AppUser } from '../lib/firebase';
 import { useEffect, useState } from 'react';
-import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { cn } from '../lib/utils';
 
 interface HeaderProps {
   currentTab: string;
   setTab: (tab: any) => void;
   onReportClick: () => void;
+  onOpenAuth: () => void;
   isGovMode: boolean;
   setIsGovMode: (val: boolean) => void;
 }
@@ -22,13 +22,14 @@ export function Header({
   currentTab, 
   setTab, 
   onReportClick,
+  onOpenAuth,
   isGovMode,
   setIsGovMode
 }: HeaderProps) {
-  const [user, setUser] = useState<FirebaseUser | null>(null);
+  const [user, setUser] = useState<AppUser | null>(null);
 
   useEffect(() => {
-    return onAuthStateChanged(auth, (u) => setUser(u));
+    return onAppAuthStateChanged((u) => setUser(u));
   }, []);
 
   return (
@@ -127,7 +128,7 @@ export function Header({
             <div className="text-right hidden lg:block">
               <p className="text-xs font-bold leading-none">{user.displayName?.split(' ')[0]}</p>
               <p className="text-[9px] text-slate-400 font-semibold mt-0.5">
-                {isGovMode ? 'Gestor Público' : 'Cidadão'}
+                {user.role === 'admin' ? 'Administrador' : isGovMode ? 'Gestor Público' : 'Cidadão'}
               </p>
             </div>
             <img 
@@ -146,8 +147,8 @@ export function Header({
           </div>
         ) : (
           <button 
-            onClick={() => loginWithGoogle()}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-white rounded-xl transition-all border border-slate-700 text-xs font-bold"
+            onClick={onOpenAuth}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl transition-all border border-blue-500 text-xs font-bold shadow-md shadow-blue-500/20"
           >
             <User size={14} />
             <span>Entrar</span>
@@ -157,4 +158,5 @@ export function Header({
     </header>
   );
 }
+
 

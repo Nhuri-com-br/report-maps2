@@ -1,8 +1,3 @@
-/**
- * @license
- * SPDX-License-Identifier: Apache-2.0
- */
-
 import { useState, useEffect } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { Header } from './components/Header';
@@ -13,6 +8,7 @@ import { ReportForm } from './components/ReportForm';
 import { GovDashboard } from './components/GovDashboard';
 import { IssueDetailModal } from './components/IssueDetailModal';
 import { AcademicSection } from './components/AcademicSection';
+import { AuthModal } from './components/AuthModal';
 import { UrbanIssue, IssueStatus, MunicipalDepartment, IssuePriority, Comment as IssueComment } from './types';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -34,16 +30,16 @@ import {
 } from 'lucide-react';
 import { ISSUE_TYPES, APP_NAME, APP_TAGLINE, DEPARTMENTS, STATUS_CONFIG, PRIORITIES } from './constants';
 import { cn } from './lib/utils';
-import { auth, loginWithGoogle } from './lib/firebase';
-import { onAuthStateChanged, User } from 'firebase/auth';
+import { onAppAuthStateChanged, AppUser } from './lib/firebase';
 import { issueService } from './services/issueService';
 import { commentService } from './services/commentService';
 
 export default function App() {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<AppUser | null>(null);
   const [currentTab, setCurrentTab] = useState<string>('dashboard');
   const [isGovMode, setIsGovMode] = useState<boolean>(false);
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [selectedIssue, setSelectedIssue] = useState<UrbanIssue | null>(null);
   const [issues, setIssues] = useState<UrbanIssue[]>([]);
   const [clickedLocation, setClickedLocation] = useState<{ lat: number, lng: number } | undefined>(undefined);
@@ -51,6 +47,7 @@ export default function App() {
   const [comments, setComments] = useState<IssueComment[]>([]);
   const [newComment, setNewComment] = useState('');
   const [isOfficialComment, setIsOfficialComment] = useState(false);
+
 
   const setTab = (newTab: string) => {
     if (newTab !== 'forum') {
@@ -147,7 +144,7 @@ export default function App() {
   };
 
   useEffect(() => {
-    const unsubscribeAuth = onAuthStateChanged(auth, (u) => {
+    const unsubscribeAuth = onAppAuthStateChanged((u) => {
       setUser(u);
     });
 
@@ -171,7 +168,11 @@ export default function App() {
   }, [selectedIssueForForum]);
 
   const handleSendComment = async () => {
-    if (!user || !selectedIssueForForum || !newComment.trim()) return;
+    if (!user) {
+      setIsAuthModalOpen(true);
+      return;
+    }
+    if (!selectedIssueForForum || !newComment.trim()) return;
     try {
       await commentService.addComment(selectedIssueForForum.id, newComment, {
         isOfficial: isOfficialComment || isGovMode,
@@ -188,6 +189,7 @@ export default function App() {
     try {
       await issueService.createIssue({
         ...data,
+        reporterName: user?.displayName || data.reporterName || 'Cidadão Anônimo'
       });
       setIsReportModalOpen(false);
       setClickedLocation(undefined);
@@ -199,7 +201,7 @@ export default function App() {
 
   const handleToggleLike = async (issue: UrbanIssue) => {
     if (!user) {
-      loginWithGoogle();
+      setIsAuthModalOpen(true);
       return;
     }
     const isLiked = issue.likedBy?.includes(user.uid);
@@ -216,6 +218,7 @@ export default function App() {
       console.error(error);
     }
   };
+
 
   const renderContent = () => {
     // Se a aba for um filtro de mapa, renderiza o mapa
@@ -591,10 +594,10 @@ export default function App() {
                     <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 text-center space-y-2">
                       <p className="text-xs font-semibold text-slate-600">Faça login para participar da discussão pública.</p>
                       <button 
-                        onClick={() => loginWithGoogle()}
+                        onClick={() => setIsAuthModalOpen(true)}
                         className="bg-blue-600 text-white px-4 py-1.5 rounded-xl text-xs font-bold hover:bg-blue-700 shadow-sm transition-all"
                       >
-                        Entrar com Google
+                        Entrar no Sistema
                       </button>
                     </div>
                   ) : (
@@ -663,6 +666,7 @@ export default function App() {
           currentTab={currentTab} 
           setTab={setTab} 
           onReportClick={() => setIsReportModalOpen(true)} 
+          onOpenAuth={() => setIsAuthModalOpen(true)}
           isGovMode={isGovMode}
           setIsGovMode={setIsGovMode}
         />
@@ -771,6 +775,13 @@ export default function App() {
         currentUserId={user?.uid}
       />
 
+      {/* Modal de Autenticação / Login Rápido */}
+      <AuthModal
+        isOpen={isAuthModalOpen}
+        onClose={() => setIsAuthModalOpen(false)}
+        onSuccess={(u) => setUser(u)}
+      />
+
       <MobileNav 
         currentTab={currentTab} 
         setTab={setTab} 
@@ -780,5 +791,6 @@ export default function App() {
     </div>
   );
 }
+
 
 
